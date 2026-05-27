@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0e1a">
+<title>持股試算</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0a0e1a;
+  --surface:  #111827;
+  --surface2: #1a2236;
+  --border:   #1e2d45;
+  --accent:   #38bdf8;
+  --accent2:  #0ea5e9;
+  --text:     #e2e8f0;
+  --muted:    #4b6080;
+  --bull:     #f87171;
+  --bear:     #34d399;
+  --warn:     #fbbf24;
+  --mono:     'DM Mono', monospace;
+  --sans:     'Noto Sans TC', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100dvh; padding-bottom: env(safe-area-inset-bottom, 16px); }
+
+/* ── Header ── */
+.app-header {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(10,14,26,.95);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px 10px;
+}
+.header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.app-title { font-family: var(--mono); font-size: 15px; font-weight: 500; color: var(--accent); letter-spacing: .04em; }
+
+/* ── Load button + dropdown ── */
+.load-wrap { position: relative; }
+.load-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); cursor: pointer; font-family: var(--sans); font-size: 13px;
+  font-weight: 500; padding: 7px 13px; transition: border-color .2s; user-select: none;
+}
+.load-btn:hover { border-color: var(--accent); }
+.load-btn:active { opacity: .75; }
+.load-btn .chevron { font-size: 10px; color: var(--muted); margin-left: 2px; transition: transform .2s; }
+.load-btn.open .chevron { transform: rotate(180deg); }
+
+.load-dropdown {
+  display: none; position: absolute; right: 0; top: calc(100% + 6px);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  min-width: 220px; overflow: hidden; z-index: 300;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+}
+.load-dropdown.open { display: block; }
+
+.dd-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 14px; cursor: pointer; border-bottom: 1px solid var(--border);
+  transition: background .15s;
+}
+.dd-item:last-child { border-bottom: none; }
+.dd-item:hover { background: var(--surface2); }
+.dd-item:active { background: rgba(56,189,248,.08); }
+.dd-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.dd-text {}
+.dd-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.dd-sub { font-size: 11px; color: var(--muted); line-height: 1.4; }
+
+#fileInput { display: none; }
+
+/* Tax row */
+.tax-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.tax-row label { white-space: nowrap; }
+.tax-input {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--accent); font-family: var(--mono); font-size: 13px; font-weight: 500;
+  padding: 5px 8px; width: 80px; outline: none; text-align: right; transition: border-color .2s;
+}
+.tax-input:focus { border-color: var(--accent); }
+.tax-suffix { color: var(--muted); font-size: 12px; }
+
+/* ── Modal overlay ── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,.65);
+  backdrop-filter: blur(4px); z-index: 500; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  width: 100%; max-width: 480px; overflow: hidden;
+}
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid var(--border);
+}
+.modal-title { font-size: 14px; font-weight: 700; color: var(--text); }
+.modal-close {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 20px; line-height: 1; padding: 0 4px; transition: color .2s;
+}
+.modal-close:hover { color: var(--text); }
+.modal-body { padding: 16px; }
+
+/* GitHub modal */
+.gh-row { display: flex; gap: 8px; align-items: stretch; }
+.gh-input {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); font-family: var(--mono); font-size: 13px; padding: 9px 12px;
+  outline: none; transition: border-color .2s; min-width: 0;
+}
+.gh-input:focus { border-color: var(--accent); }
+.gh-input::placeholder { color: var(--muted); font-size: 12px; }
+.gh-hint { font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+.gh-hint code { font-family: var(--mono); color: var(--accent); background: rgba(56,189,248,.08); padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+
+/* Paste modal */
+.paste-area {
+  width: 100%; height: 160px; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font-family: var(--mono); font-size: 12px;
+  line-height: 1.6; padding: 10px 12px; outline: none; resize: vertical;
+  transition: border-color .2s;
+}
+.paste-area:focus { border-color: var(--accent); }
+.paste-area::placeholder { color: var(--muted); }
+
+/* Action button */
+.btn-action {
+  background: var(--accent2); border: none; border-radius: 8px; color: #000;
+  cursor: pointer; font-family: var(--sans); font-size: 13px; font-weight: 700;
+  padding: 9px 18px; transition: background .2s, transform .1s; white-space: nowrap; flex-shrink: 0;
+}
+.btn-action:hover { background: var(--accent); }
+.btn-action:active { transform: scale(.96); }
+.btn-full { width: 100%; margin-top: 10px; }
+
+/* Error text */
+.err-text { font-size: 12px; color: var(--bull); margin-top: 8px; min-height: 18px; }
+
+/* ── Summary bar ── */
+.summary-bar { display: none; gap: 0; border-bottom: 1px solid var(--border); background: var(--surface); }
+.summary-bar.visible { display: flex; }
+.sum-item { flex: 1; padding: 10px 12px; border-right: 1px solid var(--border); min-width: 0; }
+.sum-item:last-child { border-right: none; }
+.sum-label { font-size: 10px; color: var(--muted); letter-spacing: .04em; margin-bottom: 3px; font-family: var(--mono); }
+.sum-val { font-family: var(--mono); font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bull { color: var(--bull); } .bear { color: var(--bear); } .neutral { color: var(--text); }
+
+/* ── Stock list ── */
+.stock-list { padding: 12px 12px 80px; display: flex; flex-direction: column; gap: 8px; }
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 80px 32px; text-align: center; }
+.empty-icon { font-size: 48px; opacity: .4; }
+.empty-title { font-size: 16px; font-weight: 700; color: var(--text); }
+.empty-sub { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+/* ── Stock Card ── */
+.stock-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; transition: border-color .2s; }
+.stock-card:has(.price-in:focus) { border-color: var(--accent); }
+.card-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px 8px; border-bottom: 1px solid var(--border); }
+.stock-name-wrap { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.stock-code { font-family: var(--mono); font-size: 11px; color: var(--muted); background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; white-space: nowrap; }
+.stock-name { font-size: 15px; font-weight: 700; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.price-wrap { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.price-label { font-size: 11px; color: var(--muted); }
+.price-in {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--warn); font-family: var(--mono); font-size: 15px; font-weight: 500;
+  outline: none; padding: 6px 10px; text-align: right; width: 90px;
+  transition: border-color .2s, color .2s; -webkit-appearance: none; appearance: none;
+}
+.price-in:focus { border-color: var(--accent); }
+.price-in::placeholder { color: var(--muted); font-size: 13px; }
+.price-in.has-value { color: var(--text); }
+.card-body { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; }
+.stat-cell { padding: 9px 12px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.stat-cell:nth-child(3), .stat-cell:nth-child(6) { border-right: none; }
+.stat-cell:nth-child(4), .stat-cell:nth-child(5), .stat-cell:nth-child(6) { border-bottom: none; }
+.stat-label { font-size: 10px; color: var(--muted); font-family: var(--mono); letter-spacing: .04em; margin-bottom: 3px; }
+.stat-val { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--text); }
+.stat-val.bull { color: var(--bull); } .stat-val.bear { color: var(--bear); } .stat-val.dim { color: var(--muted); }
+.profit-bar-wrap { height: 3px; background: var(--surface2); overflow: hidden; }
+.profit-bar { height: 100%; width: 0; transition: width .4s ease, background .3s; }
+
+/* ── FAB ── */
+.fab { position: fixed; bottom: calc(20px + env(safe-area-inset-bottom,0px)); right: 18px; width: 44px; height: 44px; border-radius: 22px; background: var(--accent2); border: none; color: #000; font-size: 18px; cursor: pointer; display: none; align-items: center; justify-content: center; box-shadow: 0 4px 20px rgba(14,165,233,.35); z-index: 200; transition: transform .2s; }
+.fab.visible { display: flex; }
+.fab:active { transform: scale(.9); }
+
+@media (min-width: 520px) {
+  .stock-list { max-width: 600px; margin: 0 auto; }
+  .summary-bar { max-width: 600px; margin: 0 auto; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── App Header ── -->
+<div class="app-header">
+  <div class="header-top">
+    <span class="app-title">📊 持股試算</span>
+    <div class="load-wrap">
+      <div class="load-btn" id="loadBtn" onclick="toggleDropdown()">
+        📂 載入資料 <span class="chevron">▼</span>
+      </div>
+      <div class="load-dropdown" id="loadDropdown">
+        <label class="dd-item" for="fileInput">
+          <span class="dd-icon">📱</span>
+          <div class="dd-text">
+            <div class="dd-title">從手機載入</div>
+            <div class="dd-sub">選取手機中的持股摘要.json</div>
+          </div>
+        </label>
+        <div class="dd-item" onclick="openModal('ghModal')">
+          <span class="dd-icon">🐙</span>
+          <div class="dd-text">
+            <div class="dd-title">從 GitHub 載入</div>
+            <div class="dd-sub">輸入 raw 網址自動抓取</div>
+          </div>
+        </div>
+        <div class="dd-item" onclick="openModal('pasteModal')">
+          <span class="dd-icon">📋</span>
+          <div class="dd-text">
+            <div class="dd-title">貼上 JSON 文字</div>
+            <div class="dd-sub">直接貼入 JSON 內容</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <input type="file" id="fileInput" accept=".json">
+  </div>
+  <div class="tax-row">
+    <label for="taxInput">交易稅</label>
+    <input type="number" id="taxInput" class="tax-input" value="0.4425" min="0" max="5" step="0.0001">
+    <span class="tax-suffix">%（賣出時扣）</span>
+  </div>
+</div>
+
+<!-- ── Summary bar ── -->
+<div class="summary-bar" id="summaryBar">
+  <div class="sum-item"><div class="sum-label">持倉市值</div><div class="sum-val neutral" id="sumValue">—</div></div>
+  <div class="sum-item"><div class="sum-label">未實現獲利</div><div class="sum-val" id="sumProfit">—</div></div>
+  <div class="sum-item"><div class="sum-label">報酬率</div><div class="sum-val" id="sumRate">—</div></div>
+</div>
+
+<!-- ── Stock list ── -->
+<div class="stock-list" id="stockList">
+  <div class="empty-state">
+    <div class="empty-icon">📂</div>
+    <div class="empty-title">尚未載入資料</div>
+    <div class="empty-sub">點擊右上角「載入資料」<br>選擇載入方式開始試算</div>
+  </div>
+</div>
+
+<button class="fab" id="fabTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+
+<!-- ── GitHub Modal ── -->
+<div class="modal-overlay" id="ghModal" onclick="overlayClose(event,'ghModal')">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title">🐙 從 GitHub 載入</span>
+      <button class="modal-close" onclick="closeModal('ghModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="gh-row">
+        <input type="url" class="gh-input" id="ghUrl" placeholder="https://raw.githubusercontent.com/…/持股摘要.json">
+        <button class="btn-action" onclick="loadFromGitHub()">載入</button>
+      </div>
+      <div class="gh-hint">
+        在 GitHub repo 中開啟 <code>持股摘要.json</code>，點右上角 <code>Raw</code>，複製網址貼在這裡
+      </div>
+      <div class="err-text" id="ghErr"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Paste Modal ── -->
+<div class="modal-overlay" id="pasteModal" onclick="overlayClose(event,'pasteModal')">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title">📋 貼上 JSON 文字</span>
+      <button class="modal-close" onclick="closeModal('pasteModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <textarea class="paste-area" id="pasteArea" placeholder='[{"股號":"2330","股名":"台積電","張數":1,"均成本":600.00},…]'></textarea>
+      <div class="err-text" id="pasteErr"></div>
+      <button class="btn-action btn-full" onclick="loadFromPaste()">確認載入</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let holdings = [];
+let taxRate = 0.4425;
+
+const fileInput  = document.getElementById('fileInput');
+const taxInput   = document.getElementById('taxInput');
+const stockList  = document.getElementById('stockList');
+const summaryBar = document.getElementById('summaryBar');
+const sumValue   = document.getElementById('sumValue');
+const sumProfit  = document.getElementById('sumProfit');
+const sumRate    = document.getElementById('sumRate');
+const fabTop     = document.getElementById('fabTop');
+
+// ── Dropdown ──
+function toggleDropdown() {
+  const btn = document.getElementById('loadBtn');
+  const dd  = document.getElementById('loadDropdown');
+  const open = dd.classList.toggle('open');
+  btn.classList.toggle('open', open);
+}
+document.addEventListener('click', e => {
+  if (!document.getElementById('loadBtn').contains(e.target) &&
+      !document.getElementById('loadDropdown').contains(e.target)) {
+    document.getElementById('loadDropdown').classList.remove('open');
+    document.getElementById('loadBtn').classList.remove('open');
+  }
+});
+
+// ── Modal helpers ──
+function openModal(id) {
+  document.getElementById('loadDropdown').classList.remove('open');
+  document.getElementById('loadBtn').classList.remove('open');
+  document.getElementById(id).classList.add('open');
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function overlayClose(e, id) { if (e.target === document.getElementById(id)) closeModal(id); }
+
+// ── Load: file ──
+fileInput.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    parseAndLoad(ev.target.result, null);
+    e.target.value = '';
+  };
+  reader.readAsText(file, 'UTF-8');
+});
+
+// ── Load: GitHub ──
+async function loadFromGitHub() {
+  const url = document.getElementById('ghUrl').value.trim();
+  const err = document.getElementById('ghErr');
+  err.textContent = '';
+  if (!url) { err.textContent = '請輸入網址'; return; }
+  err.textContent = '載入中…';
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const ok = parseAndLoad(text, 'ghErr');
+    if (ok) closeModal('ghModal');
+  } catch(e) {
+    document.getElementById('ghErr').textContent = '載入失敗：' + e.message;
+  }
+}
+
+// ── Load: paste ──
+function loadFromPaste() {
+  const text = document.getElementById('pasteArea').value.trim();
+  const ok = parseAndLoad(text, 'pasteErr');
+  if (ok) { closeModal('pasteModal'); document.getElementById('pasteArea').value = ''; }
+}
+
+// ── Common parse ──
+function parseAndLoad(text, errId) {
+  try {
+    const data = JSON.parse(text);
+    if (!Array.isArray(data) || !data.length) throw new Error('格式不正確');
+    holdings = data;
+    renderCards();
+    return true;
+  } catch(e) {
+    if (errId) document.getElementById(errId).textContent = '解析失敗：' + e.message;
+    else alert('讀取失敗：' + e.message);
+    return false;
+  }
+}
+
+// ── Tax ──
+taxInput.addEventListener('input', () => {
+  taxRate = parseFloat(taxInput.value) || 0;
+  recalcAll();
+});
+
+// ── FAB ──
+window.addEventListener('scroll', () => {
+  fabTop.classList.toggle('visible', window.scrollY > 200);
+});
+
+// ── Helpers ──
+function fmt(n, d=2) { return Number(n).toLocaleString('zh-TW', {minimumFractionDigits:d, maximumFractionDigits:d}); }
+function fmtMoney(n) { return Math.abs(n) >= 1e6 ? (n/1e6).toFixed(2)+'M' : fmt(n,0); }
+function sign(n) { return n > 0 ? '+' : ''; }
+function colorClass(n) { return n > 0 ? 'bull' : n < 0 ? 'bear' : 'dim'; }
+
+function calcStock(h, price) {
+  const qty = h['張數'] || 0, avg = h['均成本'] || 0, tax = taxRate / 100;
+  if (!price || price <= 0) return null;
+  const diff   = price - avg;
+  const profit = (diff - price * tax) * qty * 1000;
+  const rate   = avg > 0 ? ((price * (1 - tax) - avg) / avg * 100) : 0;
+  const value  = price * (1 - tax) * qty * 1000;
+  return { diff, profit, rate, value };
+}
+
+// ── Render ──
+function renderCards() {
+  if (!holdings.length) return;
+  summaryBar.classList.add('visible');
+  stockList.innerHTML = '';
+  holdings.forEach((h, idx) => {
+    const card = document.createElement('div');
+    card.className = 'stock-card';
+    card.dataset.idx = idx;
+    card.innerHTML = `
+      <div class="card-head">
+        <div class="stock-name-wrap">
+          <span class="stock-code">${h['股號']||'—'}</span>
+          <span class="stock-name">${h['股名']||'—'}</span>
+        </div>
+        <div class="price-wrap">
+          <span class="price-label">現價</span>
+          <input type="number" class="price-in" placeholder="輸入" step="0.01" data-idx="${idx}" inputmode="decimal">
+        </div>
+      </div>
+      <div class="profit-bar-wrap"><div class="profit-bar" id="bar-${idx}"></div></div>
+      <div class="card-body">
+        <div class="stat-cell"><div class="stat-label">均成本</div><div class="stat-val">${fmt(h['均成本'])}</div></div>
+        <div class="stat-cell"><div class="stat-label">持股張數</div><div class="stat-val">${h['張數']} 張</div></div>
+        <div class="stat-cell"><div class="stat-label">差價</div><div class="stat-val dim" id="diff-${idx}">—</div></div>
+        <div class="stat-cell"><div class="stat-label">獲利(含稅)</div><div class="stat-val dim" id="profit-${idx}">—</div></div>
+        <div class="stat-cell"><div class="stat-label">報酬率</div><div class="stat-val dim" id="rate-${idx}">—</div></div>
+        <div class="stat-cell"><div class="stat-label">現值</div><div class="stat-val dim" id="value-${idx}">—</div></div>
+      </div>`;
+    stockList.appendChild(card);
+  });
+  stockList.querySelectorAll('.price-in').forEach(inp => inp.addEventListener('input', onPriceInput));
+  updateSummary();
+}
+
+function onPriceInput(e) {
+  const inp = e.target, idx = parseInt(inp.dataset.idx), price = parseFloat(inp.value);
+  inp.classList.toggle('has-value', !!inp.value);
+  const h = holdings[idx], c = calcStock(h, price);
+  const diffEl = document.getElementById(`diff-${idx}`), profitEl = document.getElementById(`profit-${idx}`);
+  const rateEl = document.getElementById(`rate-${idx}`),  valueEl = document.getElementById(`value-${idx}`);
+  const bar    = document.getElementById(`bar-${idx}`);
+  if (!c) {
+    diffEl.textContent = profitEl.textContent = rateEl.textContent = valueEl.textContent = '—';
+    diffEl.className = profitEl.className = rateEl.className = valueEl.className = 'stat-val dim';
+    bar.style.width = '0'; updateSummary(); return;
+  }
+  const cc = colorClass(c.profit);
+  diffEl.textContent   = sign(c.diff)   + fmt(c.diff);
+  profitEl.textContent = sign(c.profit) + fmtMoney(c.profit);
+  rateEl.textContent   = sign(c.rate)   + fmt(c.rate) + '%';
+  valueEl.textContent  = fmtMoney(c.value);
+  diffEl.className   = `stat-val ${colorClass(c.diff)}`;
+  profitEl.className = rateEl.className = `stat-val ${cc}`;
+  valueEl.className  = `stat-val ${cc}`;
+  bar.style.width      = Math.min(Math.abs(c.rate), 50) / 50 * 100 + '%';
+  bar.style.background = c.profit >= 0 ? 'var(--bull)' : 'var(--bear)';
+  updateSummary();
+}
+
+function recalcAll() {
+  stockList.querySelectorAll('.price-in').forEach(inp => inp.dispatchEvent(new Event('input')));
+}
+
+function updateSummary() {
+  let totalValue = 0, totalBasis = 0, anyPrice = false;
+  stockList.querySelectorAll('.price-in').forEach(inp => {
+    const price = parseFloat(inp.value), h = holdings[parseInt(inp.dataset.idx)];
+    if (!price || price <= 0) return;
+    anyPrice = true;
+    const c = calcStock(h, price); if (!c) return;
+    totalValue += c.value;
+    totalBasis += (h['均成本']||0) * (h['張數']||0) * 1000;
+  });
+  if (!anyPrice) {
+    sumValue.textContent = sumProfit.textContent = sumRate.textContent = '—';
+    sumValue.className = sumProfit.className = sumRate.className = 'sum-val neutral'; return;
+  }
+  const profit = totalValue - totalBasis, rate = totalBasis > 0 ? profit/totalBasis*100 : 0;
+  const cc = colorClass(profit);
+  sumValue.textContent  = '$' + fmt(totalValue, 0);
+  sumProfit.textContent = sign(profit) + '$' + fmt(profit, 0);
+  sumRate.textContent   = sign(rate) + fmt(rate) + '%';
+  sumValue.className  = 'sum-val neutral';
+  sumProfit.className = sumRate.className = `sum-val ${cc}`;
+}
+</script>
+</body>
+</html>
